@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from dotenv import load_dotenv
-from google import genai
+import google.generativeai as genai
 import os
 
 # Load environment variables from .env file
@@ -11,7 +11,8 @@ if not GEMINI_API_KEY:
     raise RuntimeError("Missing GEMINI_API_KEY in .env file")
 
 # Initialize Gemini client
-client = genai.Client(api_key=GEMINI_API_KEY)
+genai.configure(api_key=GEMINI_API_KEY)
+model = genai.GenerativeModel('gemini-pro')
 
 # Initialize FastAPI app
 app = FastAPI(title="LeetCode AI Hint Backend")
@@ -53,18 +54,16 @@ async def generate_hint(req: HintRequest):
             "Explain the next steps without writing code."
         )
 
-    # Call Gemini Chat Completions API
+    # Call Gemini API
     try:
-        response = client.chat.completions.create(
-            model="models/chat-bison-001",
-            prompt=[
-                {"author": "system", "content": system_msg},
-                {"author": "user",   "content": user_content}
-            ],
-            temperature=0.2,
-            max_output_tokens=150,
+        response = model.generate_content(
+            f"{system_msg}\n\n{user_content}",
+            generation_config={
+                "temperature": 0.2,
+                "max_output_tokens": 150,
+            }
         )
-        hint = response.choices[0].message.content.strip()
+        hint = response.text.strip()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Gemini API error: {e}")
 
