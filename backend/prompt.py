@@ -17,36 +17,39 @@ client = genai.Client(api_key=GEMINI_API_KEY)
 app = FastAPI(title="LeetCode AI Hint Backend")
 
 # Define request structure
+typings = ("code", "theory")
 class HintRequest(BaseModel):
-    mode: str        # "beginner" or "advanced"
+    hint_type: str        # "code" or "theory"
     problem: str
     code_so_far: str = ""
 
 @app.post("/generate-hint")
 async def generate_hint(req: HintRequest):
     """
-    Generate a coding hint based on mode:
-    - beginner: return minimal code snippet
-    - advanced: return strategy in plain English
+    Generate a coding hint based on hint_type:
+    - code: return minimal code snippet
+    - theory: return strategy in plain English
     """
-    # Validate mode
-    if req.mode not in {"beginner", "advanced"}:
-        raise HTTPException(status_code=400, detail="Mode must be 'beginner' or 'advanced'.")
+    # Validate hint_type
+    if req.hint_type not in typings:
+        raise HTTPException(status_code=400, detail="hint_type must be 'code' or 'theory'.")
 
     # Prepare system and user messages
-    if req.mode == "beginner":
+    if req.hint_type == "code":
         system_msg = "You are a coding assistant. Respond only with the minimal code snippet needed to progress."
         user_content = (
-            f"Problem:\n{req.problem}\n\n"  
-            f"Code so far:\n{req.code_so_far}\n\n"  
+            f"Problem:\n{req.problem}\n\n"
+            f"Code so far:\n{req.code_so_far}\n\n"
             "Generate only a small code snippet to help progress."
         )
     else:
-        system_msg = ("You are a senior engineer mentor. Explain the next steps and algorithmic approach "
-                      "in plain English without code.")
+        system_msg = (
+            "You are a senior engineer mentor. Explain the next steps and algorithmic approach "
+            "in plain English without code."
+        )
         user_content = (
-            f"Problem:\n{req.problem}\n\n"  
-            f"Code so far:\n{req.code_so_far}\n\n"  
+            f"Problem:\n{req.problem}\n\n"
+            f"Code so far:\n{req.code_so_far}\n\n"
             "Explain the next steps without writing code."
         )
 
@@ -61,12 +64,22 @@ async def generate_hint(req: HintRequest):
             temperature=0.2,
             max_output_tokens=150,
         )
-        # Extract generated hint
         hint = response.choices[0].message.content.strip()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Gemini API error: {e}")
 
-    return {"hint": hint}
+    # Structured JSON response
+    if req.hint_type == "code":
+        return {
+            "type": "code",
+            "language": "python",
+            "snippet": hint
+        }
+    else:
+        return {
+            "type": "theory",
+            "message": hint
+        }
 
 if __name__ == "__main__":
     import uvicorn
